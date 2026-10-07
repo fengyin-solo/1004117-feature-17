@@ -69,3 +69,16 @@ npm run build
   `frontend/src/data/seed.ts`。
 - 状态流转只允许在 `local-service.ts` 里改，页面组件不做业务判断。
 - 想回到初始数据：清掉浏览器里 `airport-ground-handling:entries` 这一项，或调用 `resetModule(模块)`。
+
+## 机坪安全整改归属管控
+
+- 班组与巡查区域的归属配置在 `frontend/src/data/teams.ts`；当前登录班组在页面右上角切换，
+  会话状态在 `frontend/src/stores/session.ts`。
+- 巡查编号、巡查区域、巡查人员、整改措施、安全状态只能由责任班组维护，其他班组只读；
+  越权或跨区域提交由 `frontend/src/api/apron-safety-service.ts` 直接拒绝（通用
+  `runAction` 对机坪安全同样拒绝，页面按钮只做展示控制）。
+- 同一问题被两组认领时以先受理者为准；归属以记录上快照的责任班组为准，人员调班后历史整改仍归原班组。
+- 整改闭环后自动把放行结论同步到航班保障清单：存在未闭环隐患的航班显示「暂缓放行」，全部闭环显示「安全放行」。
+- 存量缺区域问题在启动迁移（`frontend/src/data/migrations.ts`）中受控回填：优先按巡查人员所属班组
+  主区域回填，查不到班组的兜底到值班班组主区域；回填记录打「回填」标记并写入审计日志
+  （`airport-ground-handling:apron-backfill-log`），页面顶部会展示回填明细。

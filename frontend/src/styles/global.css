@@ -35,3 +35,17 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .error-text { color: #b42318; }
 .status-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; font-size: 12px; color: var(--muted); }
 .legend-item { background: #eef2f7; border-radius: 999px; padding: 2px 10px; }
+.head-team select { margin-left: 4px; border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; background: #fff; }
+.banner { background: #eff4ff; border: 1px solid #b2ccff; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #1d4ed8; margin: 0 0 10px; }
+.banner.warn { background: #fffaeb; border-color: #fedf89; color: #b54708; }
+.tag { display: inline-block; font-size: 11px; background: #fef0c7; color: #b54708; border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+.readonly-hint { color: var(--muted); font-size: 12px; }
+.notice-text { color: #067647; }
+.modal-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal-card { background: #fff; border-radius: 8px; padding: 16px 20px; width: 560px; max-width: 92vw; }
+.modal-card h3 { margin: 0 0 12px; font-size: 15px; }
+.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modal-grid label span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.modal-grid input, .modal-grid select, .modal-grid textarea { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
+.modal-grid .span-2 { grid-column: span 2; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }

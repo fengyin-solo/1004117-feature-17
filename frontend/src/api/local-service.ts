@@ -1,6 +1,7 @@
 import { MODULE_BY_KEY } from '@/data/modules'
 import { allRows, listRows, resetRows, saveRows } from '@/data/local-store'
 import type { ActionResult, EntryRow, ModuleMeta, OverviewResult, PageResult } from '@/data/types'
+import { backfillLegacyRegions, syncAllFlightReleases } from './apron-safety-service'
 
 // 会写进数据的「往回走」动作：命中就把这条记录标成异常态，看板上能一眼看出来。
 const NEGATIVE_ACTIONS = ['撤销', '作废', '拒绝', '驳回', '停用', '忽略', '下线', '回滚']
@@ -29,6 +30,11 @@ export function listEntries(key: string, filters: Record<string, string> = {}): 
 }
 
 export function runAction(key: string, id: number, action: string): ActionResult {
+  // 机坪安全已纳入整改归属管控：状态流转必须走 apron-safety-service 的班组权限通道，
+  // 通用入口直接拒绝，避免越权绕过。
+  if (key === 'apron_safety') {
+    return { ok: false, message: '机坪安全记录已纳入整改归属管控，请在机坪安全页面由责任班组操作' }
+  }
   const meta = moduleMeta(key)
   const target = meta.actionTargets[action]
   if (!target) {
@@ -58,6 +64,13 @@ export function runAction(key: string, id: number, action: string): ActionResult
 
 export function resetModule(key: string): PageResult {
   resetRows(key)
+  // 机坪安全/航班保障重置后，重新执行受控回填与放行结论同步，避免回到不一致状态
+  if (key === 'apron_safety') {
+    backfillLegacyRegions()
+  }
+  if (key === 'apron_safety' || key === 'flight_ops') {
+    syncAllFlightReleases()
+  }
   return listEntries(key)
 }
 

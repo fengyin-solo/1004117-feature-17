@@ -3,7 +3,7 @@
     <header class="page-head">
       <div>
         <h2>航班保障管理</h2>
-        <p class="page-desc">维护航班保障，围绕航班号、机尾号、计划到港、实际到港做登记、筛选与状态流转。</p>
+        <p class="page-desc">维护航班保障，围绕航班号、机尾号、计划到港、实际到港做登记、筛选与状态流转；放行结论由机坪安全整改闭环情况自动同步。</p>
       </div>
       <div class="page-actions">
         <button class="btn primary" type="button" @click="openCreate">登记航班保障</button>
@@ -43,7 +43,13 @@
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+          <td
+            v-for="column in columns"
+            :key="column"
+            :class="{ 'error-text': column === '放行结论' && String(row[column] ?? '').startsWith('暂缓') }"
+          >
+            {{ row[column] ?? '—' }}
+          </td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
@@ -82,7 +88,7 @@ import {
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('flight_ops')
-const columns = ["航班号", "机尾号", "计划到港", "实际到港", "计划离港", "预计离港", "保障节点", "保障状态"]
+const columns = ["航班号", "机尾号", "计划到港", "实际到港", "计划离港", "预计离港", "保障节点", "保障状态", "放行结论"]
 const actions = ["启动保障", "确认就绪", "标记延误"]
 const statuses = ["待保障", "保障中", "已就绪", "已延误"]
 const stats = [{"label": "待保障航班", "value": 0}, {"label": "保障中航班", "value": 0}, {"label": "延误航班", "value": 0}]
