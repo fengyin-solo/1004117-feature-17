@@ -1,3 +1,4 @@
+import { backfillApronSafetyRows } from './apron-ownership'
 import { SEED_ROWS } from './seed'
 import type { EntryRow } from './types'
 
@@ -8,22 +9,36 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
+// 存量数据受控回填：机坪安全缺区域的记录按确定性规则补划辖区，只补空白、可重复执行。
+function withApronRegionBackfill(data: Record<string, EntryRow[]>): Record<string, EntryRow[]> {
+  const safety = data['apron_safety']
+  if (!safety || safety.length === 0) {
+    return data
+  }
+  const { rows, changed } = backfillApronSafetyRows(safety)
+  return changed ? { ...data, apron_safety: rows } : data
+}
+
 function readStorage(): Record<string, EntryRow[]> {
   const fallback = clone(SEED_ROWS)
   if (typeof window === 'undefined' || !window.localStorage) {
-    return fallback
+    return withApronRegionBackfill(fallback)
   }
   const raw = window.localStorage.getItem(STORAGE_KEY)
   if (!raw) {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback))
-    return fallback
+    const seeded = withApronRegionBackfill(fallback)
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
+    return seeded
   }
   try {
     const parsed = JSON.parse(raw) as Record<string, EntryRow[]>
-    return { ...fallback, ...parsed }
+    const merged = withApronRegionBackfill({ ...fallback, ...parsed })
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
+    return merged
   } catch {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback))
-    return fallback
+    const seeded = withApronRegionBackfill(fallback)
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
+    return seeded
   }
 }
 
@@ -41,7 +56,9 @@ export function listRows(key: string): EntryRow[] {
 }
 
 export function saveRows(key: string, rows: EntryRow[]): void {
-  const next = { ...allRows(), [key]: rows }
+  // 机坪安全每次落库都过一遍受控回填，保证缺区域的存量问题在任何写路径下都会被补划辖区。
+  const safeRows = key === 'apron_safety' ? backfillApronSafetyRows(rows).rows : rows
+  const next = { ...allRows(), [key]: safeRows }
   cache = next
   if (typeof window !== 'undefined' && window.localStorage) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))

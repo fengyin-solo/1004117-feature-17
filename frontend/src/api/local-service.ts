@@ -1,9 +1,14 @@
+import { checkApronAccess } from '@/data/apron-ownership'
 import { MODULE_BY_KEY } from '@/data/modules'
 import { allRows, listRows, resetRows, saveRows } from '@/data/local-store'
 import type { ActionResult, EntryRow, ModuleMeta, OverviewResult, PageResult } from '@/data/types'
+import { useSessionStore } from '@/stores/session'
 
 // 会写进数据的「往回走」动作：命中就把这条记录标成异常态，看板上能一眼看出来。
 const NEGATIVE_ACTIONS = ['撤销', '作废', '拒绝', '驳回', '停用', '忽略', '下线', '回滚']
+
+// 整改完成后要同步放行结论的航班保障字段。
+const FLIGHT_RELEASE_FIELD = '放行结论'
 
 export function moduleMeta(key: string): ModuleMeta {
   const meta = MODULE_BY_KEY.get(key)
@@ -50,10 +55,56 @@ export function runAction(key: string, id: number, action: string): ActionResult
     pending: target !== lastStatus,
     abnormal: NEGATIVE_ACTIONS.some((verb) => action.startsWith(verb)),
   }
+  // 机坪安全：整改归属校验，越权或跨区域提交直接拒绝；未受理问题由先受理班组认领。
+  let releaseNote = ''
+  if (key === 'apron_safety') {
+    const team = useSessionStore().team
+    const access = checkApronAccess(rows[index], team)
+    if (!access.ok) {
+      return { ok: false, message: access.message }
+    }
+    if (access.claim) {
+      updated['责任班组'] = team
+      if (access.backfillRegion) {
+        updated['巡查区域'] = access.backfillRegion
+      }
+    }
+    if (target === '已闭环') {
+      releaseNote = syncFlightRelease(updated)
+    }
+  }
   const next = [...rows]
   next[index] = updated
   saveRows(key, next)
-  return { ok: true, message: `${meta.entity}已${action}，当前状态「${target}」` }
+  return { ok: true, message: `${meta.entity}已${action}，当前状态「${target}」${releaseNote}` }
+}
+
+// 机坪安全整改闭环后，同步关联航班在航班保障清单里的放行结论。
+function syncFlightRelease(safetyRow: EntryRow): string {
+  const flightNo = String(safetyRow['关联航班'] ?? '').trim()
+  if (!flightNo) {
+    return ''
+  }
+  const conclusion = `机坪安全已闭环·准予放行（${safetyRow['巡查编号']}）`
+  const flights = listRows('flight_ops')
+  let touched = 0
+  const next = flights.map((row) => {
+    if (String(row['航班号'] ?? '').trim() !== flightNo || row[FLIGHT_RELEASE_FIELD] === conclusion) {
+      return row
+    }
+    touched += 1
+    return { ...row, [FLIGHT_RELEASE_FIELD]: conclusion }
+  })
+  if (touched > 0) {
+    saveRows('flight_ops', next)
+  }
+  return touched > 0 ? `，已同步${touched}条航班保障放行结论` : ''
+}
+
+// 页面只读化用：当前班组对某条机坪安全记录是否可维护，以及只读原因。
+export function apronSafetyPermission(row: EntryRow): { editable: boolean; reason: string } {
+  const access = checkApronAccess(row, useSessionStore().team)
+  return access.ok ? { editable: true, reason: '' } : { editable: false, reason: access.message }
 }
 
 export function resetModule(key: string): PageResult {

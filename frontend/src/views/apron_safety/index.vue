@@ -24,6 +24,11 @@
       </span>
     </p>
 
+    <p class="status-legend">
+      <span class="legend-item">当前班组：{{ session.team }}</span>
+      <span class="legend-item">巡查编号、巡查区域、巡查人员、整改措施、安全状态仅责任班组可维护，其他班组只读</span>
+    </p>
+
     <form class="filter-bar" @submit.prevent="reload">
       <label v-for="field in filterFields" :key="field" class="filter-item">
         <span>{{ field }}</span>
@@ -46,15 +51,18 @@
           <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
-            <button
-              v-for="action in actions"
-              :key="action"
-              class="link"
-              type="button"
-              @click="runAction(action, row)"
-            >
-              {{ action }}
-            </button>
+            <template v-if="permissionOf(row).editable">
+              <button
+                v-for="action in actions"
+                :key="action"
+                class="link"
+                type="button"
+                @click="runAction(action, row)"
+              >
+                {{ action }}
+              </button>
+            </template>
+            <span v-else class="readonly-tag" :title="permissionOf(row).reason">只读</span>
           </td>
         </tr>
         <tr v-if="!rows.length">
@@ -74,18 +82,22 @@
 import { computed, onMounted, ref } from 'vue'
 
 import {
+  apronSafetyPermission,
   downloadEntries,
   listEntries,
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
 import type { EntryRow } from '@/data/types'
+import { useSessionStore } from '@/stores/session'
 
 const meta = moduleMeta('apron_safety')
-const columns = ["巡查编号", "巡查区域", "巡查人员", "巡查日期", "发现问题", "整改措施", "复查结果", "安全状态"]
+const columns = ["巡查编号", "巡查区域", "巡查人员", "巡查日期", "发现问题", "整改措施", "复查结果", "安全状态", "责任班组", "关联航班"]
 const actions = ["记录巡查", "安排整改", "确认闭环"]
 const statuses = ["待巡查", "已巡查", "待整改", "已闭环"]
 const stats = [{"label": "今日巡查", "value": 0}, {"label": "待整改问题", "value": 0}, {"label": "已闭环问题", "value": 0}]
+
+const session = useSessionStore()
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
@@ -110,6 +122,10 @@ function exportRows() {
 
 function openCreate() {
   errorMessage.value = '机坪安全登记入口尚未接入审批流'
+}
+
+function permissionOf(row: EntryRow) {
+  return apronSafetyPermission(row)
 }
 
 function runAction(action: string, row: EntryRow) {
